@@ -1,3 +1,4 @@
+// Target .NET Framework 4.8
 using System;
 using System.Data;
 using System.IO;
@@ -19,20 +20,19 @@ namespace epplus
         private const string AppName = "DemoEPPlusMIP";
         private const string UserEmail = "<USUARIO>";      // p.ej. usuario@dominio.com
         private const string LabelId = "<LABEL_ID>";      // ID de la etiqueta de sensibilidad
-        private static readonly string[] Scopes = new[] { "https://graph.microsoft.com/.default" };  // Scope para Client Credentials
 
         static void Main(string[] args)
         {
             // 1. Aceptar la licencia de EPPlus
-            // Documentación EPPlus Licensing: https://epplussoftware.com/docs/5.0/articles/licensing.html
+            // https://epplussoftware.com/docs/5.0/articles/licensing.html
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
             // 2. Inicializar SDK MIP para operaciones de archivo
-            // MIP.Initialize: https://learn.microsoft.com/information-protection/develop/quick-file-set-get-label-csharp#initialize-the-sdk
+            // https://learn.microsoft.com/information-protection/develop/quick-file-set-get-label-csharp#initialize-the-sdk
             MIP.Initialize(MipComponent.File);
 
             // 3. Configurar ApplicationInfo
-            // ApplicationInfo: https://learn.microsoft.com/information-protection/develop/quick-file-set-get-label-csharp#define-applicationinfo
+            // https://learn.microsoft.com/information-protection/develop/quick-file-set-get-label-csharp#define-applicationinfo
             var appInfo = new ApplicationInfo
             {
                 ApplicationId = ClientId,
@@ -41,25 +41,29 @@ namespace epplus
             };
 
             // 4. Instanciar los delegados de autenticación y consentimiento
-            // AuthDelegateImplementation (MSAL Client Credentials): https://learn.microsoft.com/azure/active-directory/develop/v2-oauth2-client-creds-grant-flow
-            var authDelegate = new AuthDelegateImplementation(ClientId, ClientSecret, TenantId, Scopes);
-            // ConsentDelegateImplementation: https://learn.microsoft.com/information-protection/develop/quick-file-set-get-label-csharp#consent-delegate
+            // AuthDelegateImplementation (Client Credentials)
+            // https://learn.microsoft.com/azure/active-directory/develop/v2-oauth2-client-creds-grant-flow
+            var authDelegate = new AuthDelegateImplementation(ClientId, ClientSecret, TenantId);
+            // ConsentDelegateImplementation
+            // https://learn.microsoft.com/information-protection/develop/quick-file-set-get-label-csharp#consent-delegate
             var consentDelegate = new ConsentDelegateImplementation();
 
             // 5. Crear configuración y contexto de MIP
-            // MipConfiguration y CreateMipContext: https://learn.microsoft.com/information-protection/develop/quick-file-set-get-label-csharp#create-mipcontext
+            // https://learn.microsoft.com/information-protection/develop/quick-file-set-get-label-csharp#create-mipcontext
             var mipConfiguration = new MipConfiguration(appInfo, "mip_data", LogLevel.Trace, false);
             var mipContext = MIP.CreateMipContext(mipConfiguration);
 
             // 6. Configurar y cargar el perfil de archivo
-            // FileProfileSettings y LoadFileProfileAsync: https://learn.microsoft.com/information-protection/develop/quick-file-set-get-label-csharp#load-file-profile
+            // https://learn.microsoft.com/information-protection/develop/quick-file-set-get-label-csharp#load-file-profile
             var profileSettings = new FileProfileSettings(mipContext, CacheStorageType.OnDiskEncrypted, consentDelegate);
             var fileProfile = Task.Run(async () => await MIP.LoadFileProfileAsync(profileSettings)).Result;
 
             // 7. Configurar y crear el motor de archivo
-            // FileEngineSettings y AddEngineAsync: https://learn.microsoft.com/information-protection/develop/quick-file-set-get-label-csharp#create-engine
-            var engineSettings = new FileEngineSettings(UserEmail, authDelegate, string.Empty, "es-ES");
-            engineSettings.Identity = new Identity(UserEmail);
+            // https://learn.microsoft.com/information-protection/develop/quick-file-set-get-label-csharp#create-engine
+            var engineSettings = new FileEngineSettings(UserEmail, authDelegate, string.Empty, "es-ES")
+            {
+                Identity = new Identity(UserEmail)
+            };
             var fileEngine = Task.Run(async () => await fileProfile.AddEngineAsync(engineSettings)).Result;
 
             // 8. Crear datos de ejemplo y generar archivo Excel
@@ -85,7 +89,7 @@ namespace epplus
             }
 
             // 10. Liberar recursos y cerrar contexto MIP
-            // MipContext.ShutDown: https://learn.microsoft.com/information-protection/develop/quick-file-set-get-label-csharp#shutdown
+            // https://learn.microsoft.com/information-protection/develop/quick-file-set-get-label-csharp#shutdown
             fileProfile = null;
             fileEngine = null;
             mipContext.ShutDown();
@@ -95,8 +99,7 @@ namespace epplus
         static void ApplySensitivityLabel(IFileEngine fileEngine, string inputFilePath)
         {
             // CreateFileHandlerAsync: https://learn.microsoft.com/information-protection/develop/quick-file-set-get-label-csharp#create-filehandler
-            var handler = Task.Run(async () =>
-                await fileEngine.CreateFileHandlerAsync(inputFilePath, inputFilePath, true)).Result;
+            var handler = Task.Run(async () => await fileEngine.CreateFileHandlerAsync(inputFilePath, inputFilePath, true)).Result;
 
             // GetLabelById: https://learn.microsoft.com/information-protection/develop/quick-file-set-get-label-csharp#get-labels
             var label = fileEngine.GetLabelById(LabelId);
@@ -118,16 +121,12 @@ namespace epplus
     {
         private readonly IConfidentialClientApplication _clientApp;
 
-            /// <summary>
-    /// Constructor para flujo de credenciales de cliente (requiere tenantId y clientSecret)
-    /// </summary>
-    /// <param name="clientId">Client (Application) ID registrado en Azure AD</param>
-    /// <param name="clientSecret">Secreto de cliente para la aplicación confidencial</param>
-    /// <param name="tenantId">Tenant ID de Azure AD</param>
-    /// <param name="scopes">Scopes para la obtención de token (ej. "/.default")</param>
-    public AuthDelegateImplementation(string clientId, string clientSecret, string tenantId, string[] scopes)(string clientId, string clientSecret, string tenantId, string[] scopes)
+        /// <summary>
+        /// Constructor para flujo de credenciales de cliente
+        /// </summary>
+        public AuthDelegateImplementation(string clientId, string clientSecret, string tenantId)
         {
-            // Construir app confidencial MSAL: https://learn.microsoft.com/azure/active-directory/develop/v2-oauth2-client-creds-grant-flow
+            // Confidential Client App MSAL: https://learn.microsoft.com/azure/active-directory/develop/v2-oauth2-client-creds-grant-flow
             _clientApp = ConfidentialClientApplicationBuilder
                 .Create(clientId)
                 .WithClientSecret(clientSecret)
@@ -136,7 +135,7 @@ namespace epplus
         }
 
         /// <summary>
-        /// MSAL AcquireTokenForClient: https://learn.microsoft.com/dotnet/api/microsoft.identity.client.confidentialclientapplicationbuilder
+        /// AcquireTokenForClient: https://learn.microsoft.com/dotnet/api/microsoft.identity.client.confidentialclientapplicationbuilder
         /// </summary>
         public async Task<string> AcquireTokenAsync(IEnumerable<string> scopes)
         {
@@ -146,7 +145,7 @@ namespace epplus
     }
 
     /// <summary>
-    /// Implementación básica de IConsentDelegate aceptando consent automático
+    /// Implementación básica de IConsentDelegate
     /// </summary>
     public class ConsentDelegateImplementation : IConsentDelegate
     {
